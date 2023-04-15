@@ -18,8 +18,9 @@ cursor = db.cursor()
 app = Flask(__name__)
 app.secret_key = 'mysecretkey'
 
+# สร้าง decorator function สำหรับกำหนด CORS headers ใน response
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'http://127.0.0.1:5500')
+    response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE')
     return response
@@ -69,6 +70,6 @@ def register():
     return 'Register successful', 200
 
 if __name__ == '__main__':
-    CORS(app, resources={r"/*": {"origins": "http://127.0.0.1:5500"}})
+    CORS(app, resources={r"/*": {"origins": "*"}})
     app.after_request(after_request)
     app.run(port=8569,debug=True)
