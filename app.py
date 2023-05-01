@@ -11,17 +11,25 @@ app = Flask(__name__)
 CORS(app)
 app.config['SECRET_KEY'] = 'mysecretkey'
 
-
 def connect_to_database():
-    global mydb
-    mydb = mysql.connector.connect(
+    global datadb
+    datadb = mysql.connector.connect(
         host="localhost",
         user="root",
         password="",
         database="user1_db"
     )
+    global cnx
+    cnx = mysql.connector.connect(
+        user='root',
+        password='',
+        host='localhost',
+        database='user1_config'
+    )
     global mycursor
-    mycursor = mydb.cursor()
+    mycursor = datadb.cursor()
+    global configcursor
+    configcursor = cnx.cursor()
 
 
 def get_daily_usage(table_name, date):
@@ -68,7 +76,7 @@ def updatetotal():
     else:
         mycursor.execute("UPDATE `{}` SET kWh_total = %s WHERE id = 1".format(
             table), (kWh_total,))
-    mydb.commit()
+    datadb.commit()
 
     return jsonify({'message': 'Data updated successfully'}), 200
 
@@ -158,11 +166,13 @@ def calculator():
     # calculate the electricity and water usage and costs for each day
     response = {}
     for table_name in get_all_tables():
-        L_total_start, kWh_total_start = get_daily_usage(table_name, start_date)
+        L_total_start, kWh_total_start = get_daily_usage(
+            table_name, start_date)
         L_total_end, kWh_total_end = get_daily_usage(table_name, end_date)
 
         if L_total_start is not None and kWh_total_start is not None and L_total_end is not None and kWh_total_end is not None:
-            electricity_cost = (kWh_total_end - kWh_total_start) * electricity_price
+            electricity_cost = (
+                kWh_total_end - kWh_total_start) * electricity_price
             water_cost = (L_total_end - L_total_start) * water_price
             total_cost = electricity_cost + water_cost
 
@@ -178,6 +188,62 @@ def calculator():
 
     # return the response as JSON
     return jsonify(response)
+
+
+@app.route('/config')
+def get_config():
+    connect_to_database()
+    # Execute the query to retrieve all columns from the table
+    query = f"SELECT * FROM config"
+    configcursor.execute(query)
+
+    # Fetch all results and store in a dictionary
+    columns = [desc[0] for desc in configcursor.description]
+    results = configcursor.fetchall()
+    data = []
+    for row in results:
+        data.append(dict(zip(columns, row)))
+
+    # Return the results as JSON
+    return jsonify(data)
+
+
+@app.route('/updateconfig', methods=['POST'])
+def updateconfig():
+    connect_to_database()
+    # รับข้อมูล JSON จาก request
+    data = request.get_json()
+
+    # ดึงข้อมูลต่างๆจาก JSON
+    water_rate = data['water_rate']
+    electricity_rate = data['electricity_rate']
+    auto_send_bill = data['auto_send_bill']
+    bill_send_date = data['bill_send_date']
+    payment_id = data['payment_id']
+
+    # เขียน SQL query สำหรับ update ข้อมูล
+    sql = "UPDATE config SET water_rate = %s, electricity_rate = %s, auto_send_bill = %s, bill_send_date = %s, payment_id = %s WHERE id = 1"
+    val = (water_rate, electricity_rate,
+           auto_send_bill, bill_send_date, payment_id)
+
+    # execute คำสั่ง SQL
+    configcursor.execute(sql, val)
+
+    # commit การเปลี่ยนแปลงข้อมูล
+    cnx.commit()
+
+    # response ค่าเป็น JSON ให้กับ client
+    response_data = {
+        'water_rate': water_rate,
+        'electricity_rate': electricity_rate,
+        'auto_send_bill': auto_send_bill,
+        'bill_send_date': bill_send_date,
+        'payment_id': payment_id
+    }
+    response = jsonify(response_data)
+    response.status_code = 200
+    # Close cursor and connection to the database
+    return response
 
 
 if __name__ == '__main__':

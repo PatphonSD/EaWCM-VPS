@@ -1,0 +1,10 @@
+{
+    "folders": [
+        {
+            "path": "../EaWCM-Console"
+        }
+    ],
+    "settings": {
+        "liveServer.settings.port": 5501
+    }
+}
